@@ -134,9 +134,9 @@ def flag_ioos(ds):
             print(f"no flags found for {name_pyglider}")
             continue
 
-        ds[f"{name_pyglider}_quality_control"].values = flag
-        ds[f"{name_pyglider}_quality_control"].attrs["comment"] = ioos_comment
-        ds[f"{name_pyglider}_quality_control"].attrs["quality_control_set"] = 1
+        ds[f"{name_pyglider}_qc"].values = flag
+        ds[f"{name_pyglider}_qc"].attrs["comment"] = ioos_comment
+        ds[f"{name_pyglider}_qc"].attrs["quality_control_set"] = 1
     return ds
 
 
@@ -148,17 +148,17 @@ def flag_oxygen(ds):
     if "coda" in oxy_meta["make_model"] and cal_date < datetime.date(2022, 6, 30):
         # These early batches of codas were improperly calibrated
         print("bad legato")
-        pre_flags = ds["oxygen_concentration_quality_control"].values
+        pre_flags = ds["oxygen_concentration_qc"].values
         sus_flags = np.ones(len(pre_flags), dtype=int) * 3
-        ds["oxygen_concentration_quality_control"].values = np.maximum(pre_flags, sus_flags)
-        original_comment = ds["oxygen_concentration_quality_control"].attrs["comment"]
+        ds["oxygen_concentration_qc"].values = np.maximum(pre_flags, sus_flags)
+        original_comment = ds["oxygen_concentration_qc"].attrs["comment"]
         bad_oxy_comment = "Oxygen optode improperly calibrated during this deployment. Data may be recoverable."
         if "qartod" in original_comment.lower():
             comment = f"{bad_oxy_comment} {original_comment}"
         else:
             comment = bad_oxy_comment
-        ds["oxygen_concentration_quality_control"].attrs["comment"] = comment
-        ds["oxygen_concentration_quality_control"].attrs["quality_control_set"] = 1
+        ds["oxygen_concentration_qc"].attrs["comment"] = comment
+        ds["oxygen_concentration_qc"].attrs["quality_control_set"] = 1
     return ds
 
 
@@ -184,7 +184,7 @@ def flagger(ds):
             "standard_name": f"{parent_attrs['standard_name']}_flag",
             "comment": "No QC applied to this variable"}
         flag.attrs = attrs
-        ds[f"{name}_quality_control"] = flag
+        ds[f"{name}_qc"] = flag
     ds = flag_ioos(ds)
     ds = flag_oxygen(ds)
     ds.attrs["processing_level"] = "L1. Quality control flags"
