@@ -21,12 +21,11 @@ cond_temp_vars = ["potential_density", "density", "potential_temperature"]
 secondary_vars = ["oxygen_concentration"]
 vars_to_flag = temperature_vars + salinity_vars + cond_temp_vars + secondary_vars
 
-
 temp_config = {
     "temperature": {
         "qartod": {
-            "gross_range_test": {"suspect_span": [0, 30], "fail_span": [-5, 50]},
-            "spike_test": {"suspect_threshold": 0.5, "fail_threshold": 1},
+            "gross_range_test": {"suspect_span": [0, 30], "fail_span": [-2.5, 40]},
+            "spike_test": {"suspect_threshold": 2.0, "fail_threshold": 6.0},
             "location_test": {"bbox": [10, 50, 25, 60]},
         }
     }
@@ -35,15 +34,14 @@ temp_config = {
 salinity_config = {
     "salinity": {
         "qartod": {
-            "gross_range_test": {"suspect_span": [5, 30], "fail_span": [0, 40]},
-            "spike_test": {"suspect_threshold": 0.5, "fail_threshold": 1},
+            "gross_range_test": {"suspect_span": [5, 30], "fail_span": [2, 41]},
+            "spike_test": {"suspect_threshold": 0.3, "fail_threshold": 0.9},
             "location_test": {"bbox": [10, 50, 25, 60]},
         }
     }
 }
 
 tempsal_config = {**temp_config, **salinity_config}
-
 
 
 def apply_ioos_flags(ds, config):
@@ -70,7 +68,6 @@ def apply_ioos_flags(ds, config):
 
 
 def flag_ioos(ds):
-
     # extract ioos flags for these variables
     temp_flags, temp_flag_comment = apply_ioos_flags(ds, temp_config)
     temp_flagged_prop = 100 * sum(np.logical_and(temp_flags > 1, temp_flags < 9)) / len(temp_flags)
@@ -78,7 +75,6 @@ def flag_ioos(ds):
     sal_flags, sal_flag_comment = apply_ioos_flags(ds, salinity_config)
     sal_flagged_prop = 100 * sum(np.logical_and(sal_flags > 1, sal_flags < 9)) / len(sal_flags)
     print(f"Flagged {sal_flagged_prop.round(5)} % of salinity as bad")
-    # Combined flags are maximum flag of temperature and salinity data
     cond_temp_flags, cond_temp_flag_comment = apply_ioos_flags(ds, tempsal_config)
     combi_flagged_prop = 100 * sum(np.logical_and(cond_temp_flags > 1, cond_temp_flags < 9)) / len(cond_temp_flags)
     print(f"Flagged {combi_flagged_prop.round(5)} % of values derived from temperature and salinity as bad")
@@ -86,16 +82,22 @@ def flag_ioos(ds):
     for name_pyglider in vars_to_flag:
         if name_pyglider in temperature_vars:
             flag = temp_flags
-            ioos_comment = f"Quality control flags from IOOS QC QARTOD Version: " \
-                           f"{ioos_qc.__version__}. Using cfg: {temp_flag_comment} "
+            ioos_comment = f"Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc Version: " \
+                           f"{ioos_qc.__version__}. Threshold values from EuroGOOS DATA-MEQ Working Group (2010)" \
+                           f" Recommendations for in-situ data Near Real Time Quality Control [Version 1.2]. EuroGOOS" \
+                           f", 23pp. DOI http://dx.doi.org/10.25607/OBP-214. Using config: {temp_flag_comment} "
         elif name_pyglider in salinity_vars:
             flag = sal_flags
-            ioos_comment = f"Quality control flags from IOOS QC QARTOD Version: " \
-                           f"{ioos_qc.__version__}. Using cfg: {sal_flag_comment} "
+            ioos_comment = f"Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc Version: " \
+                           f"{ioos_qc.__version__}. Threshold values from EuroGOOS DATA-MEQ Working Group (2010)" \
+                           f" Recommendations for in-situ data Near Real Time Quality Control [Version 1.2]. EuroGOOS" \
+                           f", 23pp. DOI http://dx.doi.org/10.25607/OBP-214. Using config: {sal_flag_comment} "
         elif name_pyglider in cond_temp_vars:
             flag = cond_temp_flags
-            ioos_comment = f"Quality control flags from IOOS QC QARTOD Version: " \
-                           f"{ioos_qc.__version__}. Using config: {cond_temp_flag_comment} "
+            ioos_comment = f"Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc Version: " \
+                           f"{ioos_qc.__version__}. Threshold values from EuroGOOS DATA-MEQ Working Group (2010)" \
+                           f" Recommendations for in-situ data Near Real Time Quality Control [Version 1.2]. EuroGOOS" \
+                           f", 23pp. DOI http://dx.doi.org/10.25607/OBP-214. Using config: {cond_temp_flag_comment} "
         else:
             continue
 
@@ -115,9 +117,14 @@ def flag_oxygen(ds):
         print("bad legato")
         pre_flags = ds["oxygen_concentration_quality_control"].values
         sus_flags = np.ones(len(pre_flags), dtype=int) * 3
-        ds["oxygen_concentration_quality_control"].values[:] = np.maximum(pre_flags, sus_flags)
-        ds["oxygen_concentration_quality_control"].attrs["comment"] = "Oxygen optode improperly calibrated during " \
-                                                                      "this deployment. Data may be recoverable"
+        ds["oxygen_concentration_quality_control"].values = np.maximum(pre_flags, sus_flags)
+        original_comment = ds["oxygen_concentration_quality_control"].attrs["comment"]
+        bad_oxy_comment = "Oxygen optode improperly calibrated during this deployment. Data may be recoverable."
+        if "qartod" in original_comment.lower():
+            comment = f"{bad_oxy_comment} {original_comment}"
+        else:
+            comment = bad_oxy_comment
+        ds["oxygen_concentration_quality_control"].attrs["comment"] = comment
         ds["oxygen_concentration_quality_control"].attrs["quality_control_set"] = 1
     return ds
 
@@ -133,16 +140,16 @@ def flagger(ds):
         flag.values = flag_values
         parent_attrs = flag.attrs
         attrs = {
-                'ioos_qc_module': 'qartod',
-                 "quality_control_conventions": "IOOS QARTOD standard flags",
-                 "quality_control_set": 0,
-                 "valid_min": 1,
-                 "valid_max": 9,
-                 "flag_values": [1, 2, 3, 4, 9],
-                 'flag_meanings': 'GOOD, UNKNOWN, SUSPECT, FAIL, MISSING',
-                 "long_name": f"quality control flags for {parent_attrs['long_name']}",
-                 "standard_name": f"{parent_attrs['long_name']}_flag",
-                 "comment": "No QC applied to this variable"}
+            'ioos_qc_module': 'qartod',
+            "quality_control_conventions": "IOOS QARTOD standard flags",
+            "quality_control_set": 0,
+            "valid_min": 1,
+            "valid_max": 9,
+            "flag_values": [1, 2, 3, 4, 9],
+            'flag_meanings': 'GOOD, UNKNOWN, SUSPECT, FAIL, MISSING',
+            "long_name": f"quality control flags for {parent_attrs['long_name']}",
+            "standard_name": f"{parent_attrs['standard_name']}_flag",
+            "comment": "No QC applied to this variable"}
         flag.attrs = attrs
         ds[f"{name}_quality_control"] = flag
     ds = flag_ioos(ds)
