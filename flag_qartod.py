@@ -22,25 +22,6 @@ secondary_vars = ["oxygen_concentration"]
 vars_to_flag = temperature_vars + salinity_vars + cond_temp_vars + secondary_vars
 
 
-
-
-default_config = {
-    "chlorophyll": {
-        "qartod": {
-            "gross_range_test": {"suspect_span": [0, 10], "fail_span": [-1, 20]},
-            "spike_test": {"suspect_threshold": 0.5, "fail_threshold": 1},
-            "location_test": {"bbox": [10, 50, 25, 60]},
-        }
-    },
-    "temperature": {
-        "qartod": {
-            "gross_range_test": {"suspect_span": [0, 30], "fail_span": [-5, 50]},
-            "spike_test": {"suspect_threshold": 0.5, "fail_threshold": 1},
-            "location_test": {"bbox": [10, 50, 25, 60]},
-        }
-    }
-}
-
 temp_config = {
     "temperature": {
         "qartod": {
@@ -61,23 +42,7 @@ salinity_config = {
     }
 }
 
-tempsal_config = {
-    "temperature": {
-        "qartod": {
-            "gross_range_test": {"suspect_span": [0, 30], "fail_span": [-5, 50]},
-            "spike_test": {"suspect_threshold": 0.5, "fail_threshold": 1},
-            "location_test": {"bbox": [10, 50, 25, 60]},
-        }
-    },
-    "salinity": {
-        "qartod": {
-            "gross_range_test": {"suspect_span": [5, 30], "fail_span": [0, 40]},
-            "spike_test": {"suspect_threshold": 0.5, "fail_threshold": 1},
-            "location_test": {"bbox": [10, 50, 25, 60]},
-        }
-    }
-}
-
+tempsal_config = {**temp_config, **salinity_config}
 
 
 
@@ -130,7 +95,7 @@ def flag_ioos(ds):
         elif name_pyglider in cond_temp_vars:
             flag = cond_temp_flags
             ioos_comment = f"Quality control flags from IOOS QC QARTOD Version: " \
-                           f"{ioos_qc.__version__}. Using cfg: {cond_temp_flag_comment} "
+                           f"{ioos_qc.__version__}. Using config: {cond_temp_flag_comment} "
         else:
             continue
 
@@ -148,7 +113,9 @@ def flag_oxygen(ds):
     if "coda" in oxy_meta["make_model"] and cal_date < datetime.date(2022, 6, 30):
         # These early batches of codas were improperly calibrated
         print("bad legato")
-        ds["oxygen_concentration_quality_control"].values[:] = 3
+        pre_flags = ds["oxygen_concentration_quality_control"].values
+        sus_flags = np.ones(len(pre_flags), dtype=int) * 3
+        ds["oxygen_concentration_quality_control"].values[:] = np.maximum(pre_flags, sus_flags)
         ds["oxygen_concentration_quality_control"].attrs["comment"] = "Oxygen optode improperly calibrated during " \
                                                                       "this deployment. Data may be recoverable"
         ds["oxygen_concentration_quality_control"].attrs["quality_control_set"] = 1
