@@ -7,6 +7,8 @@ from ioos_qc.streams import XarrayStream
 from ioos_qc.results import collect_results, CollectedResult
 import datetime
 from pathlib import Path
+import logging
+_log = logging.getLogger(__name__)
 
 pyglider_cotede_var_names = {
     "pressure": "PRES",
@@ -67,7 +69,7 @@ chl_config = {
 
 def apply_ioos_flags(ds, config):
     if not set(config.keys()).issubset(set(list(ds))):
-        print(f"{ds.keys} not found in dataset. Skipping")
+        _log.warning(f"{ds.keys} not found in dataset. Skipping")
         return None, None
     c = Config(config)
     qc = XarrayStream(ds, lon="longitude", lat="latitude")
@@ -92,20 +94,20 @@ def flag_ioos(ds):
     # extract ioos flags for these variables
     temp_flags, temp_flag_comment = apply_ioos_flags(ds, temp_config)
     temp_flagged_prop = 100 * sum(np.logical_and(temp_flags > 1, temp_flags < 9)) / len(temp_flags)
-    print(f"Flagged {temp_flagged_prop.round(5)} % of temperature as bad")
+    _log.info(f"Flagged {temp_flagged_prop.round(5)} % of temperature as bad")
     sal_flags, sal_flag_comment = apply_ioos_flags(ds, salinity_config)
     sal_flagged_prop = 100 * sum(np.logical_and(sal_flags > 1, sal_flags < 9)) / len(sal_flags)
-    print(f"Flagged {sal_flagged_prop.round(5)} % of salinity as bad")
+    _log.info(f"Flagged {sal_flagged_prop.round(5)} % of salinity as bad")
     cond_temp_flags, cond_temp_flag_comment = apply_ioos_flags(ds, tempsal_config)
     combi_flagged_prop = 100 * sum(np.logical_and(cond_temp_flags > 1, cond_temp_flags < 9)) / len(cond_temp_flags)
-    print(f"Flagged {combi_flagged_prop.round(5)} % of values derived from temperature and salinity as bad")
+    _log.info(f"Flagged {combi_flagged_prop.round(5)} % of values derived from temperature and salinity as bad")
     oxy_flags, oxy_flag_comment = apply_ioos_flags(ds, oxygen_config)
     if oxy_flags is not None:
         oxy_flagged_prop = 100 * sum(np.logical_and(oxy_flags > 1, oxy_flags < 9)) / len(oxy_flags)
-        print(f"Flagged {oxy_flagged_prop.round(5)} % of oxygen as bad")
+        _log.info(f"Flagged {oxy_flagged_prop.round(5)} % of oxygen as bad")
     chl_flags, chl_flag_comment = apply_ioos_flags(ds, chl_config)
     chl_flagged_prop = 100 * sum(np.logical_and(chl_flags > 1, chl_flags < 9)) / len(chl_flags)
-    print(f"Flagged {chl_flagged_prop.round(5)} % of chlorophyll as bad")
+    _log.info(f"Flagged {chl_flagged_prop.round(5)} % of chlorophyll as bad")
     # Apply flags and add comment
     for name_pyglider in vars_to_flag:
         if name_pyglider in temperature_vars:
@@ -135,10 +137,10 @@ def flag_ioos(ds):
             ioos_comment = f"Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc Version: " \
                            f"{ioos_qc.__version__}. Using config: {chl_flag_comment} "
         else:
-            print(f"no flags found for {name_pyglider}")
+            _log.info(f"no flags found for {name_pyglider}")
             continue
         if flag is None:
-            print(f"no flags found for {name_pyglider}")
+            _log.info(f"no flags computed for {name_pyglider}")
             continue
 
         ds[f"{name_pyglider}_qc"].values = flag
@@ -154,7 +156,7 @@ def flag_oxygen(ds):
     cal_date = datetime.date.fromisoformat(oxy_meta["calibration_date"])
     if "coda" in oxy_meta["make_model"] and cal_date < datetime.date(2022, 6, 30):
         # These early batches of codas were improperly calibrated
-        print("bad legato")
+        _log.info("bad legato")
         pre_flags = ds["oxygen_concentration_qc"].values
         sus_flags = np.ones(len(pre_flags), dtype=int) * 3
         ds["oxygen_concentration_qc"].values = np.maximum(pre_flags, sus_flags)
@@ -172,7 +174,7 @@ def flag_oxygen(ds):
 def flagger(ds):
     for name in vars_to_flag:
         if name not in list(ds):
-            print(f"{name} not found in ds. Skipping")
+            _log.info(f"{name} not found in ds. Skipping")
             continue
         flag = ds[name].copy()
         flag_values = np.empty(len(flag.values), dtype=int)
