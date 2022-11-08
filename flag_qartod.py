@@ -10,12 +10,6 @@ from pathlib import Path
 import logging
 _log = logging.getLogger(__name__)
 
-pyglider_cotede_var_names = {
-    "pressure": "PRES",
-    "temperature": "TEMP",
-    "salinity": "PSAL",
-    "depth": "DEPTH",
-}
 
 temperature_vars = ["temperature"]
 salinity_vars = ["salinity", "conductivity"]
@@ -34,6 +28,11 @@ temp_config = {
 }
 
 salinity_config = {
+    "conductivity": {
+        "qartod": {
+            "gross_range_test": {"suspect_span": [6, 42], "fail_span": [3, 45]}
+        }
+    },
     "salinity": {
         "qartod": {
             "gross_range_test": {"suspect_span": [5, 38], "fail_span": [2, 41]},
