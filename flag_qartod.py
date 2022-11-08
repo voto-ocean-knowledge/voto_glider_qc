@@ -201,14 +201,17 @@ def flagger(ds):
     return ds
 
 
-def apply_flags(ds, max_flag_accepted=2):
+def apply_flags(ds, max_flag_accepted=2, var_max_flags={}):
     variable_list = list(ds)
     for var_name in variable_list:
         if var_name[-2:] == "qc":
             flag = ds[var_name]
             var = var_name[:-3]
             data = ds[var].values
-            data[flag > max_flag_accepted] = np.nan
+            if var in var_max_flags.keys():
+                data[flag > var_max_flags[var]] = np.nan
+            else:
+                data[flag > max_flag_accepted] = np.nan
     return ds
 
 
