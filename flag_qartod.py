@@ -34,7 +34,7 @@ temp_config = {
 salinity_config = {
     "salinity": {
         "qartod": {
-            "gross_range_test": {"suspect_span": [5, 30], "fail_span": [2, 41]},
+            "gross_range_test": {"suspect_span": [5, 38], "fail_span": [2, 41]},
             "spike_test": {"suspect_threshold": 0.3, "fail_threshold": 0.9},
             "location_test": {"bbox": [10, 50, 25, 60]},
         }
@@ -57,7 +57,7 @@ oxygen_config = {
 chl_config = {
     "chlorophyll": {
         "qartod": {
-            "gross_range_test": {"suspect_span": [-1, 10], "fail_span": [-1, 15]},
+            "gross_range_test": {"suspect_span": [0, 10], "fail_span": [-1, 15]},
             "spike_test": {"suspect_threshold": 1, "fail_threshold": 5},
             "location_test": {"bbox": [10, 50, 25, 60]},
         }
@@ -66,6 +66,9 @@ chl_config = {
 
 
 def apply_ioos_flags(ds, config):
+    if not set(config.keys()).issubset(set(list(ds))):
+        print(f"{ds.keys} not found in dataset. Skipping")
+        return None, None
     c = Config(config)
     qc = XarrayStream(ds, lon="longitude", lat="latitude")
     runner = list(qc.run(c))
@@ -97,8 +100,9 @@ def flag_ioos(ds):
     combi_flagged_prop = 100 * sum(np.logical_and(cond_temp_flags > 1, cond_temp_flags < 9)) / len(cond_temp_flags)
     print(f"Flagged {combi_flagged_prop.round(5)} % of values derived from temperature and salinity as bad")
     oxy_flags, oxy_flag_comment = apply_ioos_flags(ds, oxygen_config)
-    oxy_flagged_prop = 100 * sum(np.logical_and(oxy_flags > 1, oxy_flags < 9)) / len(oxy_flags)
-    print(f"Flagged {oxy_flagged_prop.round(5)} % of oxygen as bad")
+    if oxy_flags is not None:
+        oxy_flagged_prop = 100 * sum(np.logical_and(oxy_flags > 1, oxy_flags < 9)) / len(oxy_flags)
+        print(f"Flagged {oxy_flagged_prop.round(5)} % of oxygen as bad")
     chl_flags, chl_flag_comment = apply_ioos_flags(ds, chl_config)
     chl_flagged_prop = 100 * sum(np.logical_and(chl_flags > 1, chl_flags < 9)) / len(chl_flags)
     print(f"Flagged {chl_flagged_prop.round(5)} % of chlorophyll as bad")
@@ -123,14 +127,17 @@ def flag_ioos(ds):
                            f" Recommendations for in-situ data Near Real Time Quality Control [Version 1.2]. EuroGOOS" \
                            f", 23pp. DOI http://dx.doi.org/10.25607/OBP-214. Using config: {cond_temp_flag_comment} "
         elif name_pyglider == "oxygen_concentration":
-            flag = cond_temp_flags
+            flag = oxy_flags
             ioos_comment = f"Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc Version: " \
                            f"{ioos_qc.__version__}. Using config: {oxy_flag_comment} "
         elif name_pyglider == "chlorophyll":
-            flag = cond_temp_flags
+            flag = chl_flags
             ioos_comment = f"Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc Version: " \
                            f"{ioos_qc.__version__}. Using config: {chl_flag_comment} "
         else:
+            print(f"no flags found for {name_pyglider}")
+            continue
+        if flag is None:
             print(f"no flags found for {name_pyglider}")
             continue
 

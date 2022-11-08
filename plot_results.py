@@ -25,8 +25,8 @@ def plot_qc(ds):
             fig1 = px.line(df, x="time", y=var)
             fig1.update_traces(line=dict(color='rgba(50,50,50,0.2)'))
             fig2 = px.scatter(df, x="time", y=var, color="quality control", size="flag",
-                             hover_data=['quality control'], symbol="flag",
-                             color_discrete_sequence=["red", "green", "blue"])
+                              hover_data=['quality control'], symbol="flag",
+                              color_discrete_sequence=["red", "green", "blue"])
 
             fig3 = go.Figure(data=fig1.data + fig2.data)
             fig3.write_html(f"figures/time_{var}.html")
