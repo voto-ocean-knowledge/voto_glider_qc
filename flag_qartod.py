@@ -193,10 +193,22 @@ def flagger(ds):
     return ds
 
 
+def apply_flags(ds, max_flag_accepted=2):
+    variable_list = list(ds)
+    for var_name in variable_list:
+        if var_name[-2:] == "qc":
+            flag = ds[var_name]
+            var = var_name[:-3]
+            data = ds[var].values
+            data[flag > max_flag_accepted] = np.nan
+    return ds
+
+
 if __name__ == '__main__':
     ds_path = Path("/home/callum/Downloads/glider_data/CABLE.nc")
     ds_in = xr.open_dataset(ds_path)
     ds_in = flagger(ds_in)
+    ds_in = apply_flags(ds_in)
     ds_path_parts = list(ds_path.parts)
     fn, extension = ds_path_parts[-1].split(".")
     fn_out = fn + "_flag"
