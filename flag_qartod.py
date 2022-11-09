@@ -11,61 +11,59 @@ import logging
 _log = logging.getLogger(__name__)
 
 
-temperature_vars = ["temperature"]
-salinity_vars = ["salinity", "conductivity"]
-cond_temp_vars = ["potential_density", "density", "potential_temperature"]
-secondary_vars = ["oxygen_concentration", "chlorophyll"]
-vars_to_flag = temperature_vars + salinity_vars + cond_temp_vars + secondary_vars
+def get_configs():
+    configs = {
+        "temperature": {
+            "temperature": {
+                "qartod": {
+                    "gross_range_test": {"suspect_span": [0, 30], "fail_span": [-2.5, 40]},
+                    "spike_test": {"suspect_threshold": 2.0, "fail_threshold": 6.0},
+                    "location_test": {"bbox": [10, 50, 25, 60]},
+                }
+            }
+        },
+        "salinity": {
+            "conductivity": {
+                "qartod": {
+                    "gross_range_test": {"suspect_span": [6, 42], "fail_span": [3, 45]}
+                }
+            },
+            "salinity": {
+                "qartod": {
+                    "gross_range_test": {"suspect_span": [5, 38], "fail_span": [2, 41]},
+                    "spike_test": {"suspect_threshold": 0.3, "fail_threshold": 0.9},
+                    "location_test": {"bbox": [10, 50, 25, 60]},
+                }
+            }
+        },
+        "oxygen_concentration": {
+            "oxygen_concentration": {
+                "qartod": {
+                    "gross_range_test": {"suspect_span": [0, 350], "fail_span": [0, 500]},
+                    "spike_test": {"suspect_threshold": 10, "fail_threshold": 50},
+                    "location_test": {"bbox": [10, 50, 25, 60]},
+                }
+            }
+        },
 
-temp_config = {
-    "temperature": {
-        "qartod": {
-            "gross_range_test": {"suspect_span": [0, 30], "fail_span": [-2.5, 40]},
-            "spike_test": {"suspect_threshold": 2.0, "fail_threshold": 6.0},
-            "location_test": {"bbox": [10, 50, 25, 60]},
+        "chlorophyll": {
+            "chlorophyll": {
+                "qartod": {
+                    "gross_range_test": {"suspect_span": [0, 10], "fail_span": [-1, 15]},
+                    "spike_test": {"suspect_threshold": 1, "fail_threshold": 5},
+                    "location_test": {"bbox": [10, 50, 25, 60]},
+                }
+            }
         }
     }
-}
-
-salinity_legato_config = {
-    "conductivity": {
-        "qartod": {
-            "gross_range_test": {"suspect_span": [6, 42], "fail_span": [3, 45]}
-        }
-    },
-    "salinity": {
-        "qartod": {
-            "gross_range_test": {"suspect_span": [5, 38], "fail_span": [2, 41]},
-            "spike_test": {"suspect_threshold": 0.3, "fail_threshold": 0.9},
-            "location_test": {"bbox": [10, 50, 25, 60]},
-        }
-    }
-}
-
-salinity_gpctd_config = salinity_legato_config.copy()
-salinity_gpctd_config["conductivity"]["qartod"]["gross_range_test"] = {"suspect_span": [0.6, 4.2], "fail_span": [0.3, 4.5]}
+    return configs
 
 
-oxygen_config = {
-    "oxygen_concentration": {
-        "qartod": {
-            "gross_range_test": {"suspect_span": [0, 350], "fail_span": [0, 500]},
-            "spike_test": {"suspect_threshold": 10, "fail_threshold": 50},
-            "location_test": {"bbox": [10, 50, 25, 60]},
-        }
-    }
-}
-
-
-chl_config = {
-    "chlorophyll": {
-        "qartod": {
-            "gross_range_test": {"suspect_span": [0, 10], "fail_span": [-1, 15]},
-            "spike_test": {"suspect_threshold": 1, "fail_threshold": 5},
-            "location_test": {"bbox": [10, 50, 25, 60]},
-        }
-    }
-}
+def derive_configs(configs):
+    cond_temp_vars = ["potential_density", "density", "potential_temperature"]
+    for var in cond_temp_vars:
+        configs[var] = {**configs["temperature"], **configs["salinity"]}
+    return configs
 
 
 def apply_ioos_flags(ds, config):
@@ -92,68 +90,43 @@ def apply_ioos_flags(ds, config):
 
 
 def flag_ioos(ds):
+    configs = get_configs()
     # If the glider has a GPCTD, use this for the salinity config
     if ds["conductivity"].attrs["units"] == 'S m-1':
-        salinity_config = salinity_gpctd_config
-    else:
-        salinity_config = salinity_legato_config
-    tempsal_config = {**temp_config, **salinity_config}
-    # extract ioos flags for these variables
-
-    temp_flags, temp_flag_comment = apply_ioos_flags(ds, temp_config)
-    temp_flagged_prop = 100 * sum(np.logical_and(temp_flags > 1, temp_flags < 9)) / len(temp_flags)
-    _log.info(f"Flagged {temp_flagged_prop.round(5)} % of temperature as bad")
-    sal_flags, sal_flag_comment = apply_ioos_flags(ds, salinity_config)
-    sal_flagged_prop = 100 * sum(np.logical_and(sal_flags > 1, sal_flags < 9)) / len(sal_flags)
-    _log.info(f"Flagged {sal_flagged_prop.round(5)} % of salinity as bad")
-    cond_temp_flags, cond_temp_flag_comment = apply_ioos_flags(ds, tempsal_config)
-    combi_flagged_prop = 100 * sum(np.logical_and(cond_temp_flags > 1, cond_temp_flags < 9)) / len(cond_temp_flags)
-    _log.info(f"Flagged {combi_flagged_prop.round(5)} % of values derived from temperature and salinity as bad")
-    oxy_flags, oxy_flag_comment = apply_ioos_flags(ds, oxygen_config)
-    if oxy_flags is not None:
-        oxy_flagged_prop = 100 * sum(np.logical_and(oxy_flags > 1, oxy_flags < 9)) / len(oxy_flags)
-        _log.info(f"Flagged {oxy_flagged_prop.round(5)} % of oxygen as bad")
-    chl_flags, chl_flag_comment = apply_ioos_flags(ds, chl_config)
-    chl_flagged_prop = 100 * sum(np.logical_and(chl_flags > 1, chl_flags < 9)) / len(chl_flags)
-    _log.info(f"Flagged {chl_flagged_prop.round(5)} % of chlorophyll as bad")
-    # Apply flags and add comment
-    for name_pyglider in vars_to_flag:
-        if name_pyglider in temperature_vars:
-            flag = temp_flags
-            ioos_comment = f"Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc Version: " \
-                           f"{ioos_qc.__version__}. Threshold values from EuroGOOS DATA-MEQ Working Group (2010)" \
-                           f" Recommendations for in-situ data Near Real Time Quality Control [Version 1.2]. EuroGOOS" \
-                           f", 23pp. DOI http://dx.doi.org/10.25607/OBP-214. Using config: {temp_flag_comment} "
-        elif name_pyglider in salinity_vars:
-            flag = sal_flags
-            ioos_comment = f"Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc Version: " \
-                           f"{ioos_qc.__version__}. Threshold values from EuroGOOS DATA-MEQ Working Group (2010)" \
-                           f" Recommendations for in-situ data Near Real Time Quality Control [Version 1.2]. EuroGOOS" \
-                           f", 23pp. DOI http://dx.doi.org/10.25607/OBP-214. Using config: {sal_flag_comment} "
-        elif name_pyglider in cond_temp_vars:
-            flag = cond_temp_flags
-            ioos_comment = f"Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc Version: " \
-                           f"{ioos_qc.__version__}. Threshold values from EuroGOOS DATA-MEQ Working Group (2010)" \
-                           f" Recommendations for in-situ data Near Real Time Quality Control [Version 1.2]. EuroGOOS" \
-                           f", 23pp. DOI http://dx.doi.org/10.25607/OBP-214. Using config: {cond_temp_flag_comment} "
-        elif name_pyglider == "oxygen_concentration":
-            flag = oxy_flags
-            ioos_comment = f"Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc Version: " \
-                           f"{ioos_qc.__version__}. Using config: {oxy_flag_comment} "
-        elif name_pyglider == "chlorophyll":
-            flag = chl_flags
-            ioos_comment = f"Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc Version: " \
-                           f"{ioos_qc.__version__}. Using config: {chl_flag_comment} "
-        else:
-            _log.info(f"no flags found for {name_pyglider}")
+        configs["salinity"]["conductivity"]["qartod"]["gross_range_test"] = {"suspect_span": [0.6, 4.2],
+                                                                       "fail_span": [0.3, 4.5]}
+    configs = derive_configs(configs)
+    for config_name, config in configs.items():
+        if config_name not in list(ds):
+            _log.warning(f"{config_name} not found in dataset")
             continue
-        if flag is None:
-            _log.info(f"no flags computed for {name_pyglider}")
-            continue
-
-        ds[f"{name_pyglider}_qc"].values = flag
-        ds[f"{name_pyglider}_qc"].attrs["comment"] = ioos_comment
-        ds[f"{name_pyglider}_qc"].attrs["quality_control_set"] = 1
+        # extract ioos flags for these variables
+        flags, comment = apply_ioos_flags(ds, config)
+        flagged_prop = 100 * sum(np.logical_and(flags > 1, flags < 9)) / len(flags)
+        _log.info(f"Flagged {flagged_prop.round(3)} % of {config_name} as bad")
+        # Apply flags and add comment
+        ioos_comment = f"Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc Version: " \
+                       f"{ioos_qc.__version__}. Using config: {comment}."
+        if "temperature" in config.keys() or "salinity" in config.keys() or "conductivity" in config.keys():
+            ioos_comment = f"{ioos_comment}  Threshold values from EuroGOOS DATA-MEQ Working Group (2010)" \
+                           f" Recommendations for in-situ data Near Real Time Quality Control [Version 1.2]. EuroGOOS" \
+                           f", 23pp. DOI http://dx.doi.org/10.25607/OBP-214."
+        
+        flag = ds[config_name].copy()
+        flag.values = flags
+        parent_attrs = flag.attrs
+        flag.attrs = {
+            'ioos_qc_module': 'qartod',
+            "quality_control_conventions": "IOOS QARTOD standard flags",
+            "quality_control_set": 1,
+            "valid_min": 1,
+            "valid_max": 9,
+            "flag_values": [1, 2, 3, 4, 9],
+            'flag_meanings': 'GOOD, UNKNOWN, SUSPECT, FAIL, MISSING',
+            "long_name": f"quality control flags for {parent_attrs['long_name']}",
+            "standard_name": f"{parent_attrs['standard_name']}_flag",
+            "comment": ioos_comment}
+        ds[f"{config_name}_qc"] = flag
     return ds
 
 
@@ -169,42 +142,19 @@ def flag_oxygen(ds):
         sus_flags = np.ones(len(pre_flags), dtype=int) * 3
         ds["oxygen_concentration_qc"].values = np.maximum(pre_flags, sus_flags)
         original_comment = ds["oxygen_concentration_qc"].attrs["comment"]
-        bad_oxy_comment = "Oxygen optode improperly calibrated during this deployment. Data may be recoverable."
-        if "qartod" in original_comment.lower():
-            comment = f"{bad_oxy_comment} {original_comment}"
-        else:
-            comment = bad_oxy_comment
+        bad_oxy_comment = "Oxygen optode improperly calibrated during this deployment. All flags set to minimum value" \
+                          " of 3 (SUSPECT). Data may be recoverable. "
+        comment = f"{bad_oxy_comment} {original_comment}"
         ds["oxygen_concentration_qc"].attrs["comment"] = comment
         ds["oxygen_concentration_qc"].attrs["quality_control_set"] = 1
     return ds
 
 
 def flagger(ds):
-    for name in vars_to_flag:
-        if name not in list(ds):
-            _log.info(f"{name} not found in ds. Skipping")
-            continue
-        flag = ds[name].copy()
-        flag_values = np.empty(len(flag.values), dtype=int)
-        flag_values[:] = 2
-        flag.values = flag_values
-        parent_attrs = flag.attrs
-        attrs = {
-            'ioos_qc_module': 'qartod',
-            "quality_control_conventions": "IOOS QARTOD standard flags",
-            "quality_control_set": 0,
-            "valid_min": 1,
-            "valid_max": 9,
-            "flag_values": [1, 2, 3, 4, 9],
-            'flag_meanings': 'GOOD, UNKNOWN, SUSPECT, FAIL, MISSING',
-            "long_name": f"quality control flags for {parent_attrs['long_name']}",
-            "standard_name": f"{parent_attrs['standard_name']}_flag",
-            "comment": "No QC applied to this variable"}
-        flag.attrs = attrs
-        ds[f"{name}_qc"] = flag
     ds = flag_ioos(ds)
     ds = flag_oxygen(ds)
-    ds.attrs["processing_level"] = "L1. Quality control flags"
+    ds.attrs["processing_level"] = f"L1. Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc " \
+                                   f"Version: {ioos_qc.__version__} "
     ds.attrs["disclaimer"] = "Data, products and services from VOTO are provided 'as is' without any warranty as" \
                              " to fitness for a particular purpose."
     return ds
@@ -228,7 +178,7 @@ if __name__ == '__main__':
     ds_path = Path("/home/callum/Downloads/glider_data/CABLE.nc")
     ds_in = xr.open_dataset(ds_path)
     ds_in = flagger(ds_in)
-    ds_in = apply_flags(ds_in)
+    ds_in = apply_flags(ds_in, var_max_flags={"oxygen_concentration": 3})
     ds_path_parts = list(ds_path.parts)
     fn, extension = ds_path_parts[-1].split(".")
     fn_out = fn + "_flag"
