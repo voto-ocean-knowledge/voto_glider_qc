@@ -27,7 +27,7 @@ temp_config = {
     }
 }
 
-salinity_config = {
+salinity_legato_config = {
     "conductivity": {
         "qartod": {
             "gross_range_test": {"suspect_span": [6, 42], "fail_span": [3, 45]}
@@ -42,7 +42,7 @@ salinity_config = {
     }
 }
 
-salinity_gpctd_config = salinity_config.copy()
+salinity_gpctd_config = salinity_legato_config.copy()
 salinity_gpctd_config["conductivity"]["qartod"]["gross_range_test"] = {"suspect_span": [0.6, 4.2], "fail_span": [0.3, 4.5]}
 
 
@@ -95,6 +95,8 @@ def flag_ioos(ds):
     # If the glider has a GPCTD, use this for the salinity config
     if ds["conductivity"].attrs["units"] == 'S m-1':
         salinity_config = salinity_gpctd_config
+    else:
+        salinity_config = salinity_legato_config
     tempsal_config = {**temp_config, **salinity_config}
     # extract ioos flags for these variables
 
