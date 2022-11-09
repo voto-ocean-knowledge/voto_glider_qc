@@ -42,7 +42,9 @@ salinity_config = {
     }
 }
 
-tempsal_config = {**temp_config, **salinity_config}
+salinity_gpctd_config = salinity_config.copy()
+salinity_gpctd_config["conductivity"]["qartod"]["gross_range_test"] = {"suspect_span": [0.6, 4.2], "fail_span": [0.3, 4.5]}
+
 
 oxygen_config = {
     "oxygen_concentration": {
@@ -90,7 +92,12 @@ def apply_ioos_flags(ds, config):
 
 
 def flag_ioos(ds):
+    # If the glider has a GPCTD, use this for the salinity config
+    if ds["conductivity"].attrs["units"] == 'S m-1':
+        salinity_config = salinity_gpctd_config
+    tempsal_config = {**temp_config, **salinity_config}
     # extract ioos flags for these variables
+
     temp_flags, temp_flag_comment = apply_ioos_flags(ds, temp_config)
     temp_flagged_prop = 100 * sum(np.logical_and(temp_flags > 1, temp_flags < 9)) / len(temp_flags)
     _log.info(f"Flagged {temp_flagged_prop.round(5)} % of temperature as bad")
