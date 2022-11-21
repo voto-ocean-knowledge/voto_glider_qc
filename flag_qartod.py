@@ -135,7 +135,7 @@ def flag_oxygen(ds):
     import ast
     oxy_meta = ast.literal_eval(oxy_meta_str)
     cal_date = datetime.date.fromisoformat(oxy_meta["calibration_date"])
-    if "coda" in oxy_meta["make_model"] and cal_date < datetime.date(2022, 6, 30):
+    if "coda" in oxy_meta["make_model"] and cal_date < datetime.date(2022, 12, 30):
         # These early batches of codas were improperly calibrated
         _log.info("bad legato")
         pre_flags = ds["oxygen_concentration_qc"].values
