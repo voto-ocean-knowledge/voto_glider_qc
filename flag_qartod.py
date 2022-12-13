@@ -180,7 +180,7 @@ def flag_pilot(ds):
         if f"{variable}_qc" not in list(ds):
             _log.warning(f"{variable} in yaml qc section, but has no qc from IOOS. Applying minimum qc")
             flag = ds[variable].copy()
-            flag.values = 2
+            flag.values[:] = 2
             parent_attrs = flag.attrs
             flag.attrs = {
                 "quality_control_conventions": "IOOS QARTOD standard flags",
