@@ -1,5 +1,6 @@
 import xarray as xr
 import numpy as np
+import yaml
 import ioos_qc
 from ioos_qc.config import Config
 from ioos_qc.qartod import aggregate
@@ -9,6 +10,8 @@ import datetime
 from pathlib import Path
 import logging
 _log = logging.getLogger(__name__)
+
+cond_temp_vars = ["potential_density", "density", "potential_temperature"]
 
 
 def get_configs():
@@ -36,6 +39,14 @@ def get_configs():
                 }
             }
         },
+        "conductivity": {
+            "conductivity": {
+                "qartod": {
+                    "gross_range_test": {"suspect_span": [6, 42], "fail_span": [3, 45]},
+                    "location_test": {"bbox": [10, 50, 25, 60]},
+                }
+            },
+        },
         "oxygen_concentration": {
             "oxygen_concentration": {
                 "qartod": {
@@ -60,7 +71,6 @@ def get_configs():
 
 
 def derive_configs(configs):
-    cond_temp_vars = ["potential_density", "density", "potential_temperature"]
     for var in cond_temp_vars:
         configs[var] = {**configs["temperature"], **configs["salinity"]}
     return configs
@@ -150,9 +160,53 @@ def flag_oxygen(ds):
     return ds
 
 
+def flag_pilot(ds):
+    attrs = ds.attrs
+    glider = attrs["glider_serial"]
+    mission = attrs["deployment_id"]
+    mission_yaml = f"/data/deployment_yaml/mission_yaml/SEA{glider}_M{mission}.yml"
+    with open(mission_yaml) as fin:
+        deployment = yaml.safe_load(fin)
+    if "qc" not in deployment.keys():
+        return ds
+    # If temperature or conductivity flagged, add qc entries for vars derived from conductivity/temperature
+    if "temperature" in deployment["qc"]:
+        for ct_var in cond_temp_vars:
+            deployment["qc"][ct_var] = deployment["qc"]["temperature"]
+    elif "conductivity" in deployment["qc"]:
+        for ct_var in cond_temp_vars:
+            deployment["qc"][ct_var] = deployment["qc"]["conductivity"]
+    for variable in deployment["qc"]:
+        pilot_qc = deployment["qc"][variable]
+        var_qc = ds[f"{variable}_qc"]
+        time_str = ""
+        if "start" in pilot_qc.keys():
+            start_str = pilot_qc["start"]
+            start = np.datetime64(start_str)
+            time_str = f"start: {start_str}"
+        else:
+            start = np.nanmin(ds.time)
+        if "end" in pilot_qc.keys():
+            end_str = pilot_qc["end"]
+            end = np.datetime64(end_str)
+            time_str = f"{time_str}, end: {end_str}"
+        else:
+            end = np.nanmax(ds.time)
+        var_qc_timesub = var_qc.values[np.logical_and(ds.time >= start, ds.time <= end)]
+        var_qc_timesub[var_qc_timesub < pilot_qc['value']] = pilot_qc['value']
+        var_qc.values[ds.time >= start] = var_qc_timesub
+        original_comment = var_qc.attrs["comment"]
+        pilot_comment = pilot_qc["comment"]
+        comment = f"Pilot QC: {pilot_comment} {time_str}. Minimum QC value set to {pilot_qc['value']}. IOOS_QC: {original_comment}"
+        var_qc.attrs["comment"] = comment
+        _log.info(f"applied pilot QC to {variable}, min value {pilot_qc['value']}")
+    return ds
+
+
 def flagger(ds):
     ds = flag_ioos(ds)
     ds = flag_oxygen(ds)
+    ds = flag_pilot(ds)
     ds.attrs["processing_level"] = f"L1. Quality control flags from IOOS QC QARTOD https://github.com/ioos/ioos_qc " \
                                    f"Version: {ioos_qc.__version__} "
     ds.attrs["disclaimer"] = "Data, products and services from VOTO are provided 'as is' without any warranty as" \
