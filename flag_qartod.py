@@ -177,6 +177,22 @@ def flag_pilot(ds):
         for ct_var in cond_temp_vars:
             deployment["qc"][ct_var] = deployment["qc"]["conductivity"]
     for variable in deployment["qc"]:
+        if f"{variable}_qc" not in list(ds):
+            _log.warning(f"{variable} in yaml qc section, but has no qc from IOOS. Applying minimum qc")
+            flag = ds[variable].copy()
+            flag.values = 2
+            parent_attrs = flag.attrs
+            flag.attrs = {
+                "quality_control_conventions": "IOOS QARTOD standard flags",
+                "quality_control_set": 1,
+                "valid_min": 1,
+                "valid_max": 9,
+                "flag_values": [1, 2, 3, 4, 9],
+                'flag_meanings': 'GOOD, UNKNOWN, SUSPECT, FAIL, MISSING',
+                "long_name": f"quality control flags for {parent_attrs['long_name']}",
+                "standard_name": f"{parent_attrs['standard_name']}_flag",
+                "comment": "no automated QC applied"}
+            ds[f"{variable}_qc"] = flag
         pilot_qc = deployment["qc"][variable]
         var_qc = ds[f"{variable}_qc"]
         time_str = ""
