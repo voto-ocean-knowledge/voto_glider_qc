@@ -210,7 +210,7 @@ def flag_pilot(ds):
             end = np.nanmax(ds.time)
         var_qc_timesub = var_qc.values[np.logical_and(ds.time >= start, ds.time <= end)]
         var_qc_timesub[var_qc_timesub < pilot_qc['value']] = pilot_qc['value']
-        var_qc.values[ds.time >= start] = var_qc_timesub
+        var_qc.values[np.logical_and(ds.time >= start, ds.time <= end)] = var_qc_timesub
         original_comment = var_qc.attrs["comment"]
         pilot_comment = pilot_qc["comment"]
         comment = f"Pilot QC: {pilot_comment} {time_str}. Minimum QC value set to {pilot_qc['value']}. IOOS_QC: {original_comment}"
