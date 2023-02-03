@@ -60,7 +60,7 @@ def get_configs():
         "chlorophyll": {
             "chlorophyll": {
                 "qartod": {
-                    "gross_range_test": {"suspect_span": [0, 10], "fail_span": [-1, 15]},
+                    "gross_range_test": {"suspect_span": [0, 15], "fail_span": [-1, 20]},
                     "spike_test": {"suspect_threshold": 1, "fail_threshold": 5},
                     "location_test": {"bbox": [10, 50, 25, 60]},
                 }
