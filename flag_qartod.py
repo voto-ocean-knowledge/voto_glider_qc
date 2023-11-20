@@ -21,7 +21,7 @@ def get_configs():
                 "qartod": {
                     "gross_range_test": {"suspect_span": [0, 30], "fail_span": [-2.5, 40]},
                     "spike_test": {"suspect_threshold": 2.0, "fail_threshold": 6.0},
-                    "location_test": {"bbox": [10, 50, 25, 60]},
+                    "location_test": {"bbox": [10, 50, 25, 70]},
                 }
             }
         },
@@ -35,7 +35,7 @@ def get_configs():
                 "qartod": {
                     "gross_range_test": {"suspect_span": [5, 38], "fail_span": [2, 41]},
                     "spike_test": {"suspect_threshold": 0.3, "fail_threshold": 0.9},
-                    "location_test": {"bbox": [10, 50, 25, 60]},
+                    "location_test": {"bbox": [10, 50, 25, 70]},
                 }
             }
         },
@@ -43,7 +43,7 @@ def get_configs():
             "conductivity": {
                 "qartod": {
                     "gross_range_test": {"suspect_span": [6, 42], "fail_span": [3, 45]},
-                    "location_test": {"bbox": [10, 50, 25, 60]},
+                    "location_test": {"bbox": [10, 50, 25, 70]},
                 }
             },
         },
@@ -52,7 +52,7 @@ def get_configs():
                 "qartod": {
                     "gross_range_test": {"suspect_span": [0, 350], "fail_span": [0, 500]},
                     "spike_test": {"suspect_threshold": 10, "fail_threshold": 50},
-                    "location_test": {"bbox": [10, 50, 25, 60]},
+                    "location_test": {"bbox": [10, 50, 25, 70]},
                 }
             }
         },
@@ -62,7 +62,7 @@ def get_configs():
                 "qartod": {
                     "gross_range_test": {"suspect_span": [0, 15], "fail_span": [-1, 20]},
                     "spike_test": {"suspect_threshold": 1, "fail_threshold": 5},
-                    "location_test": {"bbox": [10, 50, 25, 60]},
+                    "location_test": {"bbox": [10, 50, 25, 70]},
                 }
             }
         }
